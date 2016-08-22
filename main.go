@@ -3,25 +3,26 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"flag"
 	"fmt"
-	yaml "gopkg.in/yaml.v2"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"strings"
+
+	flag "github.com/ogier/pflag"
+	yaml "gopkg.in/yaml.v2"
 )
 
 const Version = "0.0.1"
 
-var version = flag.Bool("version", false, "print version and exit")
+var version = flag.BoolP("version", "v", false, "print version and exit")
 
-var openBrowser = flag.Bool("open", false, "Open the oauth approval URL in the browser")
+var openBrowser = flag.BoolP("open", "o", true, "Open the oauth approval URL in the browser")
 
 var clientIDFlag = flag.String("client-id", "", "The ClientID for the application")
 var clientSecretFlag = flag.String("client-secret", "", "The ClientSecret for the application")
-var appFile = flag.String("config", "", "Path to a json file containing your application's ClientID and ClientSecret.")
+var appFile = flag.StringP("config", "c", "", "Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.")
 
 const oauthUrl = "https://accounts.google.com/o/oauth2/auth?redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
 

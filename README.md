@@ -5,7 +5,25 @@ This is a small helper tool to get a user get authenticated with
 as the Identity Provider.
 
 Given a ClientID and ClientSecret, the tool will output the necessary
-configurtion for `kubectl` that you can add to `~/.kube/config`
+configuration for `kubectl` that you can add to `~/.kube/config`
+
+```
+$ k8s-oidc-helper -c ./client_secret.json
+Enter the code Google gave you: <code>
+
+# Add the following to your ~/.kube/config
+users:
+- name: you@example.com
+  user:
+    auth-provider:
+      config:
+        client-id: <client-id>
+        client-secret: <client-secret>
+        id-token: <id-token>
+        idp-issuer-url: https://accounts.google.com
+        refresh-token: <refresh-token>
+      name: oidc
+```
 
 ## Setup
 
@@ -58,23 +76,23 @@ roleRef:
 ## Installation
 
 ```
-go install github.com/micahhausler/k8s-oidc-helper
+go get github.com/micahhausler/k8s-oidc-helper
 ```
 
 ## Usage
 
 ```
-Usage of ./k8s-oidc-helper:
+Usage of k8s-oidc-helper:
 
-  -client-id string
+  --client-id string
         The ClientID for the application
-  -client-secret string
+  --client-secret string
         The ClientSecret for the application
-  -config string
-        Path to a json file containing your application's ClientID and ClientSecret.
-  -open
-        Open the oauth approval URL in the browser
-  -version
+  -c, --config string
+        Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.
+  -o, --open true
+        Open the oauth approval URL in the browser. Defaults to true (default true)
+  -v, --version
         print version and exit
 ```
 
