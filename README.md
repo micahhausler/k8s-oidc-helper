@@ -13,7 +13,7 @@ Enter the code Google gave you: <code>
 
 # Add the following to your ~/.kube/config
 users:
-- name: you@example.com
+- name: you@yourdomain.com
   user:
     auth-provider:
       config:
