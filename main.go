@@ -158,7 +158,7 @@ func googleCallback() http.Handler {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		_, err = w.Write([]byte(fmt.Sprintf("Add the following to your ~/.kube/config:\n\n", response)))
+		_, err = w.Write(response)
 		if err != nil {
 			log.Println("failed to write about response")
 			w.WriteHeader(http.StatusInternalServerError)
