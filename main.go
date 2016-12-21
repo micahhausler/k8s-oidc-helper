@@ -1,34 +1,26 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
-	"strings"
 
-	flag "github.com/ogier/pflag"
+	"github.com/utilitywarehouse/go-operational/op"
 	yaml "gopkg.in/yaml.v2"
 )
 
-const Version = "0.0.1"
+var (
+	clientID     = os.Getenv("CLIENT_ID")
+	clientSecret = os.Getenv("CLIENT_SECRET")
+	callbackURL  = os.Getenv("CALLBACK_URL")
+)
 
-var version = flag.BoolP("version", "v", false, "print version and exit")
-
-var openBrowser = flag.BoolP("open", "o", true, "Open the oauth approval URL in the browser")
-
-var clientIDFlag = flag.String("client-id", "", "The ClientID for the application")
-var clientSecretFlag = flag.String("client-secret", "", "The ClientSecret for the application")
-var appFile = flag.StringP("config", "c", "", "Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.")
-
-const oauthUrl = "https://accounts.google.com/o/oauth2/auth?redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
-
-type ConfigFile struct {
-	Installed *GoogleConfig `json:"installed"`
-}
+const oauthUrl = "https://accounts.google.com/o/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
 
 type GoogleConfig struct {
 	ClientID     string `json:"client_id"`
@@ -41,20 +33,6 @@ type TokenResponse struct {
 	IdToken      string `json:"id_token"`
 }
 
-func readConfig(path string) (*GoogleConfig, error) {
-	f, err := os.Open(path)
-	defer f.Close()
-	if err != nil {
-		return nil, err
-	}
-	cf := &ConfigFile{}
-	err = json.NewDecoder(f).Decode(cf)
-	if err != nil {
-		return nil, err
-	}
-	return cf.Installed, nil
-}
-
 // Get the id_token and refresh_token from google
 func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val := url.Values{}
@@ -65,7 +43,10 @@ func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val.Add("code", code)
 
 	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v3/token", val)
-	defer resp.Body.Close()
+	defer func() {
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +91,10 @@ func getUserEmail(accessToken string) (string, error) {
 	q.Set("access_token", accessToken)
 	uri.RawQuery = q.Encode()
 	resp, err := http.Get(uri.String())
-	defer resp.Body.Close()
+	defer func() {
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 	if err != nil {
 		return "", err
 	}
@@ -140,73 +124,62 @@ func generateUser(email, clientId, clientSecret, idToken, refreshToken string) *
 	}
 }
 
-func main() {
+func googleRedirect() http.Handler {
+	redirectURL := fmt.Sprintf(oauthUrl, callbackURL, clientID)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
+		w.WriteHeader(http.StatusFound)
+	})
+}
 
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n\n", os.Args[0])
-		flag.PrintDefaults()
-	}
+func googleCallback() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		tokResponse, err := getTokens(clientID, clientSecret, code)
 
-	flag.Parse()
-
-	if *version {
-		fmt.Printf("k8s-oidc-helper %s\n", Version)
-		os.Exit(0)
-	}
-
-	var gcf *GoogleConfig
-	var err error
-	if len(*appFile) > 0 {
-		gcf, err = readConfig(*appFile)
 		if err != nil {
-			fmt.Printf("Error reading config file %s: %s\n", *appFile, err)
-			os.Exit(1)
+			fmt.Printf("Error getting tokens: %s\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
 		}
-	}
-	var clientID string
-	var clientSecret string
-	if gcf != nil {
-		clientID = gcf.ClientID
-		clientSecret = gcf.ClientSecret
-	} else {
-		clientID = *clientIDFlag
-		clientSecret = *clientSecretFlag
-	}
 
-	if *openBrowser {
-		cmd := exec.Command("open", fmt.Sprintf(oauthUrl, clientID))
-		err = cmd.Start()
-	}
-	if !*openBrowser || err != nil {
-		fmt.Printf("Open this url in your browser: %s\n", fmt.Sprintf(oauthUrl, clientID))
-	}
+		email, err := getUserEmail(tokResponse.AccessToken)
+		if err != nil {
+			fmt.Printf("Error getting user email: %s\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter the code Google gave you: ")
-	code, _ := reader.ReadString('\n')
-	code = strings.TrimSpace(code)
+		userConfig := generateUser(email, clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
+		output := map[string][]*KubectlUser{}
+		output["users"] = []*KubectlUser{userConfig}
+		response, err := yaml.Marshal(output)
+		if err != nil {
+			fmt.Printf("Error marshaling yaml: %s\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 
-	tokResponse, err := getTokens(clientID, clientSecret, code)
-	if err != nil {
-		fmt.Printf("Error getting tokens: %s\n", err)
-		os.Exit(1)
-	}
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write([]byte(fmt.Sprintf("Add the following to your ~/.kube/config:\n\n", response)))
+		if err != nil {
+			log.Println("failed to write about response")
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+}
 
-	email, err := getUserEmail(tokResponse.AccessToken)
-	if err != nil {
-		fmt.Printf("Error getting user email: %s\n", err)
-		os.Exit(1)
-	}
+func main() {
+	m := http.NewServeMux()
 
-	userConfig := generateUser(email, clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
-	output := map[string][]*KubectlUser{}
-	output["users"] = []*KubectlUser{userConfig}
-	response, err := yaml.Marshal(output)
-	if err != nil {
-		fmt.Printf("Error marshaling yaml: %s\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("\n# Add the following to your ~/.kube/config")
-	fmt.Println(string(response))
+	m.Handle("/", googleRedirect())
+	m.Handle("/callback", googleCallback())
 
+	http.Handle("/__/", op.NewHandler(
+		op.NewStatus("Kubernetes config builder", "Constructs kube config for the user to allow access to the api server.").
+			AddOwner("Infrastructure", "#infra").
+			ReadyUseHealthCheck(),
+	),
+	)
+
+	http.Handle("/", m)
+	log.Println("Listening on :8080")
+	http.ListenAndServe(":8080", nil)
 }
