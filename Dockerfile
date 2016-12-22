@@ -1,15 +1,18 @@
-# To build:
-# $ docker run --rm -v $(pwd):/go/src/github.com/micahhausler/k8s-oidc-helper -w /go/src/github.com/micahhausler/k8s-oidc-helper golang:1.7  go build -v -a -tags netgo -installsuffix netgo -ldflags '-w'
-# $ docker build -t micahhausler/k8s-oidc-helper .
-#
-# To run:
-# $ docker run micahhausler/k8s-oidc-helper
+FROM alpine
 
-FROM busybox
+ADD *.go /src/
 
-MAINTAINER Micah Hausler, <hausler.m@gmail.com>
+RUN apk --update --no-cache add ca-certificates git go \
+  && export GOPATH=/go \
+  && REPO_PATH="github.com/george-angel/k8s-oidc-helper" \
+  && mkdir -p $GOPATH/src/${REPO_PATH} \
+  && mv src/* $GOPATH/src/${REPO_PATH} \
+  && rm -rf src \
+  && cd $GOPATH/src/${REPO_PATH} \
+  && go get ./... \
+  && go build \
+  && mv k8s-oidc-helper /k8s-oidc-helper \
+  && apk del go git \
+  && rm -rf $GOPATH /var/cache/apk/*
 
-COPY k8s-oidc-helper /bin/k8s-oidc-helper
-RUN chmod 755 /bin/k8s-oidc-helper
-
-ENTRYPOINT ["/bin/k8s-oidc-helper"]
+CMD [ "/k8s-oidc-helper" ]
