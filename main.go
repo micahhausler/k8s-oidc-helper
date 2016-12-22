@@ -37,7 +37,7 @@ type TokenResponse struct {
 func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val := url.Values{}
 	val.Add("grant_type", "authorization_code")
-	val.Add("redirect_uri", "urn:ietf:wg:oauth:2.0:oob")
+	val.Add("redirect_uri", callbackURL)
 	val.Add("client_id", clientID)
 	val.Add("client_secret", clientSecret)
 	val.Add("code", code)
@@ -127,8 +127,7 @@ func generateUser(email, clientId, clientSecret, idToken, refreshToken string) *
 func googleRedirect() http.Handler {
 	redirectURL := fmt.Sprintf(oauthUrl, callbackURL, clientID)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
-		w.WriteHeader(http.StatusFound)
+		http.Redirect(w, r, redirectURL, http.StatusFound)
 	})
 }
 
@@ -138,13 +137,13 @@ func googleCallback() http.Handler {
 		tokResponse, err := getTokens(clientID, clientSecret, code)
 
 		if err != nil {
-			fmt.Printf("Error getting tokens: %s\n", err)
+			log.Printf("Error getting tokens: %s\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 
 		email, err := getUserEmail(tokResponse.AccessToken)
 		if err != nil {
-			fmt.Printf("Error getting user email: %s\n", err)
+			log.Printf("Error getting user email: %s\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 
@@ -153,7 +152,7 @@ func googleCallback() http.Handler {
 		output["users"] = []*KubectlUser{userConfig}
 		response, err := yaml.Marshal(output)
 		if err != nil {
-			fmt.Printf("Error marshaling yaml: %s\n", err)
+			log.Printf("Error marshaling yaml: %s\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 
