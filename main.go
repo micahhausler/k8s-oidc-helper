@@ -20,7 +20,8 @@ var (
 	callbackURL  = os.Getenv("CALLBACK_URL")
 )
 
-const oauthUrl = "https://accounts.google.com/o/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
+const oauthURL = "https://accounts.google.com/o/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
+const tokenURL = "https://www.googleapis.com/oauth2/v3/token"
 
 type GoogleConfig struct {
 	ClientID     string `json:"client_id"`
@@ -42,7 +43,10 @@ func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val.Add("client_secret", clientSecret)
 	val.Add("code", code)
 
-	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v3/token", val)
+	resp, err := http.PostForm(tokenURL, val)
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("Got: %d calling %s", resp.StatusCode, tokenURL)
+	}
 	defer func() {
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
@@ -91,6 +95,9 @@ func getUserEmail(accessToken string) (string, error) {
 	q.Set("access_token", accessToken)
 	uri.RawQuery = q.Encode()
 	resp, err := http.Get(uri.String())
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("Got: %d calling %s", resp.StatusCode, tokenURL)
+	}
 	defer func() {
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
@@ -125,7 +132,7 @@ func generateUser(email, clientId, clientSecret, idToken, refreshToken string) *
 }
 
 func googleRedirect() http.Handler {
-	redirectURL := fmt.Sprintf(oauthUrl, callbackURL, clientID)
+	redirectURL := fmt.Sprintf(oauthURL, callbackURL, clientID)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, redirectURL, http.StatusFound)
 	})
