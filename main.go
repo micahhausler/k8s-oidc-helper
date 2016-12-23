@@ -22,6 +22,7 @@ var (
 
 const oauthURL = "https://accounts.google.com/o/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
 const tokenURL = "https://www.googleapis.com/oauth2/v3/token"
+const userInfoURL = "https://www.googleapis.com/oauth2/v1/userinfo"
 
 type GoogleConfig struct {
 	ClientID     string `json:"client_id"`
@@ -89,7 +90,7 @@ type UserInfo struct {
 }
 
 func getUserEmail(accessToken string) (string, error) {
-	uri, _ := url.Parse("https://www.googleapis.com/oauth2/v1/userinfo")
+	uri, _ := url.Parse(userInfoURL)
 	q := uri.Query()
 	q.Set("alt", "json")
 	q.Set("access_token", accessToken)
