@@ -4,7 +4,7 @@ ADD *.go /src/
 
 RUN apk --update --no-cache add ca-certificates git go musl-dev \
   && export GOPATH=/go \
-  && REPO_PATH="github.com/george-angel/k8s-oidc-helper" \
+  && REPO_PATH="github.com/utilitywarehouse/k8s-oidc-helper" \
   && mkdir -p $GOPATH/src/${REPO_PATH} \
   && mv src/* $GOPATH/src/${REPO_PATH} \
   && rm -rf src \
