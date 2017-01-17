@@ -45,13 +45,13 @@ func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val.Add("code", code)
 
 	resp, err := http.PostForm(tokenURL, val)
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Got: %d calling %s", resp.StatusCode, tokenURL)
-	}
 	defer func() {
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
 	}()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("Got: %d calling %s", resp.StatusCode, tokenURL)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -96,13 +96,13 @@ func getUserEmail(accessToken string) (string, error) {
 	q.Set("access_token", accessToken)
 	uri.RawQuery = q.Encode()
 	resp, err := http.Get(uri.String())
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("Got: %d calling %s", resp.StatusCode, tokenURL)
-	}
 	defer func() {
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
 	}()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("Got: %d calling %s", resp.StatusCode, tokenURL)
+	}
 	if err != nil {
 		return "", err
 	}
