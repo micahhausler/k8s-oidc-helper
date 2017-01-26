@@ -45,6 +45,9 @@ func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val.Add("code", code)
 
 	resp, err := http.PostForm(tokenURL, val)
+	if err != nil {
+		return nil, err
+	}
 	defer func() {
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
@@ -96,6 +99,9 @@ func getUserEmail(accessToken string) (string, error) {
 	q.Set("access_token", accessToken)
 	uri.RawQuery = q.Encode()
 	resp, err := http.Get(uri.String())
+	if err != nil {
+		return nil, err
+	}
 	defer func() {
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
