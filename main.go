@@ -100,7 +100,7 @@ func getUserEmail(accessToken string) (string, error) {
 	uri.RawQuery = q.Encode()
 	resp, err := http.Get(uri.String())
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer func() {
 		io.Copy(ioutil.Discard, resp.Body)
