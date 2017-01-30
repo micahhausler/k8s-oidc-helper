@@ -11,7 +11,6 @@ import (
 	"os"
 
 	"github.com/utilitywarehouse/go-operational/op"
-	yaml "gopkg.in/yaml.v2"
 )
 
 var (
@@ -23,10 +22,16 @@ var (
 const oauthURL = "https://accounts.google.com/o/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
 const tokenURL = "https://www.googleapis.com/oauth2/v3/token"
 const userInfoURL = "https://www.googleapis.com/oauth2/v1/userinfo"
+const idpIssuerURL = "https://accounts.google.com"
+const kubectlCMDTemplate = "# Run the following command to configure a kubernetes user for use with `kubectl`\nkubectl config set-credentials %s \\\n--auth-provider=oidc \\\n--auth-provider-arg=client-id=%s \\\n--auth-provider-arg=client-secret=%s \\\n--auth-provider-arg=id-token=%s \\\n--auth-provider-arg=idp-issuer-url=%s \\\n--auth-provider-arg=refresh-token=%s"
 
 type GoogleConfig struct {
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
+}
+
+type UserInfo struct {
+	Email string `json:"email"`
 }
 
 type TokenResponse struct {
@@ -66,32 +71,6 @@ func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
 	return tr, nil
 }
 
-type KubectlUser struct {
-	Name         string        `yaml:"name"`
-	KubeUserInfo *KubeUserInfo `yaml:"user"`
-}
-
-type KubeUserInfo struct {
-	AuthProvider *AuthProvider `yaml:"auth-provider"`
-}
-
-type AuthProvider struct {
-	APConfig *APConfig `yaml:"config"`
-	Name     string    `yaml:"name"`
-}
-
-type APConfig struct {
-	ClientID     string `yaml:"client-id"`
-	ClientSecret string `yaml:"client-secret"`
-	IdToken      string `yaml:"id-token"`
-	IdpIssuerUrl string `yaml:"idp-issuer-url"`
-	RefreshToken string `yaml:"refresh-token"`
-}
-
-type UserInfo struct {
-	Email string `json:"email"`
-}
-
 func getUserEmail(accessToken string) (string, error) {
 	uri, _ := url.Parse(userInfoURL)
 	q := uri.Query()
@@ -120,24 +99,6 @@ func getUserEmail(accessToken string) (string, error) {
 	return ui.Email, nil
 }
 
-func generateUser(email, clientId, clientSecret, idToken, refreshToken string) *KubectlUser {
-	return &KubectlUser{
-		Name: email,
-		KubeUserInfo: &KubeUserInfo{
-			AuthProvider: &AuthProvider{
-				APConfig: &APConfig{
-					ClientID:     clientId,
-					ClientSecret: clientSecret,
-					IdToken:      idToken,
-					IdpIssuerUrl: "https://accounts.google.com",
-					RefreshToken: refreshToken,
-				},
-				Name: "oidc",
-			},
-		},
-	}
-}
-
 func googleRedirect() http.Handler {
 	redirectURL := fmt.Sprintf(oauthURL, callbackURL, clientID)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -161,17 +122,10 @@ func googleCallback() http.Handler {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 
-		userConfig := generateUser(email, clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
-		output := map[string][]*KubectlUser{}
-		output["users"] = []*KubectlUser{userConfig}
-		response, err := yaml.Marshal(output)
-		if err != nil {
-			log.Printf("Error marshaling yaml: %s\n", err)
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+		kubectlCMD := fmt.Sprintf(kubectlCMDTemplate, email, clientID, clientSecret, tokResponse.IdToken, idpIssuerURL, tokResponse.RefreshToken)
 
 		w.WriteHeader(http.StatusOK)
-		_, err = w.Write(response)
+		_, err = w.Write([]byte(kubectlCMD))
 		if err != nil {
 			log.Println("failed to write about response")
 			w.WriteHeader(http.StatusInternalServerError)
