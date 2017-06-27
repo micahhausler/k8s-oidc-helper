@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	flag "github.com/ogier/pflag"
@@ -140,8 +141,40 @@ func generateUser(email, clientId, clientSecret, idToken, refreshToken string) *
 	}
 }
 
-func main() {
+func createOpenCmd(oauthUrl, clientID string) (*exec.Cmd, error) {
+	url := fmt.Sprintf(oauthUrl, clientID)
 
+	switch os := runtime.GOOS; os {
+	case "darwin":
+		return exec.Command("open", url), nil
+	case "linux":
+		return exec.Command("xdg-open", url), nil
+	}
+
+	return nil, fmt.Errorf("Could not detect the open command for OS: %s", runtime.GOOS)
+}
+
+func launchBrowser(openBrowser bool, oauthUrl, clientID string) {
+	openInstructions := fmt.Sprintf("Open this url in your browser: %s\n", fmt.Sprintf(oauthUrl, clientID))
+
+	if !openBrowser {
+		fmt.Print(openInstructions)
+		return
+	}
+
+	cmd, err := createOpenCmd(oauthUrl, clientID)
+	if err != nil {
+		fmt.Print(openInstructions)
+		return
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		fmt.Print(openInstructions)
+	}
+}
+
+func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n\n", os.Args[0])
 		flag.PrintDefaults()
@@ -173,13 +206,7 @@ func main() {
 		clientSecret = *clientSecretFlag
 	}
 
-	if *openBrowser {
-		cmd := exec.Command("open", fmt.Sprintf(oauthUrl, clientID))
-		err = cmd.Start()
-	}
-	if !*openBrowser || err != nil {
-		fmt.Printf("Open this url in your browser: %s\n", fmt.Sprintf(oauthUrl, clientID))
-	}
+	launchBrowser(*openBrowser, oauthUrl, clientID)
 
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter the code Google gave you: ")
