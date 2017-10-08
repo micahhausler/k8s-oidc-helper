@@ -233,6 +233,8 @@ func main() {
 		fmt.Printf("Error marshaling yaml: %s\n", err)
 		os.Exit(1)
 	}
+	fmt.Println("\n These are your user credentials")
+	fmt.Printf("% \n", response)
 
 	// print kubectl command that automatically updates the user's kubectl config
 	fmt.Println("\n # Use this command to automatically update your ~/.kube/config")
