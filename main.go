@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	flag "github.com/ogier/pflag"
-	yaml "gopkg.in/yaml.v2"
 )
 
 const Version = "0.0.1"
@@ -228,12 +227,15 @@ func main() {
 	userConfig := generateUser(email, clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
 	output := map[string][]*KubectlUser{}
 	output["users"] = []*KubectlUser{userConfig}
-	response, err := yaml.Marshal(output)
-	if err != nil {
-		fmt.Printf("Error marshaling yaml: %s\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("\n# Add the following to your ~/.kube/config")
-	fmt.Println(string(response))
+
+	// print kubectl command that automatically updates the user's kubectl config
+	fmt.Println("\n # Use this command to automatically update your ~/.kube/config")
+	fmt.Printf("kubectl config set-credentials %s \\\n", email)
+	fmt.Println("--auth-provider=oidc \\")
+	fmt.Println("--auth-provider-arg=idp-issuer-url=https://accounts.google.com \\")
+	fmt.Printf("--auth-provider-arg=client-id=%s \\\n", clientID)
+	fmt.Printf("--auth-provider-arg=client-secret=%s \\\n", clientSecret)
+	fmt.Printf("--auth-provider-arg=refresh-token=%s \\\n", tokResponse.RefreshToken)
+	fmt.Printf("--auth-provider-arg=id-token=%s\n", tokResponse.IdToken)
 
 }
