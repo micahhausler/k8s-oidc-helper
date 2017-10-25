@@ -25,6 +25,23 @@ users:
       name: oidc
 ```
 
+If you prefer to use `kubectl` to edit your configuration, you may want to use
+the `-f kubectl` output format flag:
+
+```
+$ k8s-oidc-helper -c ./client_secret.json -f kubectl
+Enter the code Google gave you: <code>
+
+# Use this command to add the new user to your configuration:
+kubectl config set-credentials 'you@yourdomain.com' \
+  --auth-provider=oidc \
+  --auth-provider-arg=idp-issuer-url=https://accounts.google.com \
+  --auth-provider-arg=client-id='<client-id>' \
+  --auth-provider-arg=client-secret='<client-secret>' \
+  --auth-provider-arg=refresh-token='<refresh-token>' \
+  --auth-provider-arg=id-token='<id-token>'
+```
+
 ## Setup
 
 There is a bit of setup involved before you can use this tool.
@@ -90,8 +107,10 @@ Usage of k8s-oidc-helper:
         The ClientSecret for the application
   -c, --config string
         Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.
-  -o, --open true
-        Open the oauth approval URL in the browser. Defaults to true (default true)
+  -o, --open
+        Open the oauth approval URL in the browser (default true)
+  -f, --output-format string
+        Specify output format: "yaml" or "kubectl" (default "yaml")
   -v, --version
         print version and exit
 ```
