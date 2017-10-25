@@ -17,6 +17,13 @@ import (
 
 const Version = "0.0.1"
 
+const (
+	// Outputs a YAML snippet for ~/kube/config.
+	outputFlagYAML = "yaml"
+	// Outputs a shell snippet for kubectl.
+	outputFlagKubectl = "kubectl"
+)
+
 var version = flag.BoolP("version", "v", false, "print version and exit")
 
 var openBrowser = flag.BoolP("open", "o", true, "Open the oauth approval URL in the browser")
@@ -24,6 +31,7 @@ var openBrowser = flag.BoolP("open", "o", true, "Open the oauth approval URL in 
 var clientIDFlag = flag.String("client-id", "", "The ClientID for the application")
 var clientSecretFlag = flag.String("client-secret", "", "The ClientSecret for the application")
 var appFile = flag.StringP("config", "c", "", "Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.")
+var outputFlag = flag.StringP("output-format", "f", outputFlagYAML, fmt.Sprintf("Specify output format: \"%s\" or \"%s\"", outputFlagYAML, outputFlagKubectl))
 
 const oauthUrl = "https://accounts.google.com/o/oauth2/auth?redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
 
@@ -41,6 +49,9 @@ type TokenResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	IdToken      string `json:"id_token"`
 }
+
+// Renders and prints the actual output.
+type outputFunc func(email, clientID, clientSecret string, tokenResponse *TokenResponse)
 
 func readConfig(path string) (*GoogleConfig, error) {
 	f, err := os.Open(path)
@@ -196,6 +207,14 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	var writeOutput outputFunc
+	writeOutput, err = determineOutputFormat()
+	if err != nil {
+		fmt.Printf("Failed to determine output format: %s\n", err)
+		os.Exit(1)
+	}
+
 	var clientID string
 	var clientSecret string
 	if gcf != nil {
@@ -225,7 +244,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	userConfig := generateUser(email, clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
+	fmt.Println()
+	writeOutput(email, clientID, clientSecret, tokResponse)
+}
+
+func determineOutputFormat() (outputFunc, error) {
+	switch *outputFlag {
+	case outputFlagYAML:
+		return writeYamlOutput, nil
+	case outputFlagKubectl:
+		return writeKubectlOutput, nil
+	default:
+		return nil, fmt.Errorf("unknown output format: %s", *outputFlag)
+	}
+}
+
+// Writes a shell snippet to stdout that lets kubectl add the user to its config.
+func writeKubectlOutput(email, clientID, clientSecret string, tokenResponse *TokenResponse) {
+	fmt.Println("# Use this command to add the new user to your configuration:")
+	fmt.Printf("kubectl config set-credentials '%s' \\\n", email)
+	fmt.Println("  --auth-provider=oidc \\")
+	fmt.Println("  --auth-provider-arg=idp-issuer-url=https://accounts.google.com \\")
+	fmt.Printf("  --auth-provider-arg=client-id='%s' \\\n", clientID)
+	fmt.Printf("  --auth-provider-arg=client-secret='%s' \\\n", clientSecret)
+	fmt.Printf("  --auth-provider-arg=refresh-token='%s' \\\n", tokenResponse.RefreshToken)
+	fmt.Printf("  --auth-provider-arg=id-token='%s'\n", tokenResponse.IdToken)
+}
+
+// Writes a YAML snippet for the new user to stdout that may be added to ~/.kube/config.
+func writeYamlOutput(email, clientID, clientSecret string, tokenResponse *TokenResponse) {
+	userConfig := generateUser(email, clientID, clientSecret, tokenResponse.IdToken, tokenResponse.RefreshToken)
 	output := map[string][]*KubectlUser{}
 	output["users"] = []*KubectlUser{userConfig}
 	response, err := yaml.Marshal(output)
@@ -233,7 +281,6 @@ func main() {
 		fmt.Printf("Error marshaling yaml: %s\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("\n# Add the following to your ~/.kube/config")
+	fmt.Println("# Add the following to your ~/.kube/config")
 	fmt.Println(string(response))
-
 }
