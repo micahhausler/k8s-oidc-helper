@@ -105,11 +105,6 @@ Usage of k8s-oidc-helper:
   -w, --write                  Write config to file. Merges in the specified file
 ```
 
-## Wishlist
-
-- [x] Add tests/CI
-- [x] Add docker builds to CI
-
 ## License
 
 MIT License. See [License](/LICENSE) for full text
