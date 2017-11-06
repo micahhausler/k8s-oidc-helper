@@ -25,6 +25,19 @@ users:
       name: oidc
 ```
 
+To merge the new configuration into your existing kubectl config file, run:
+
+```
+$ k8s-oidc-helper -c ./client_secret.json --write
+Enter the code Google gave you: <code>
+
+Configuration has been written to ~/.kube/config
+
+# Then you can associate that user to a cluster
+$ kubectl config set-context <context-name> --cluster <cluster-name> --user <you@yourdomain.com>
+$ kubectl config use-context <context-name>
+```
+
 ## Setup
 
 There is a bit of setup involved before you can use this tool.
@@ -83,23 +96,19 @@ go get github.com/micahhausler/k8s-oidc-helper
 
 ```
 Usage of k8s-oidc-helper:
-
-  --client-id string
-        The ClientID for the application
-  --client-secret string
-        The ClientSecret for the application
-  -c, --config string
-        Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.
-  -o, --open true
-        Open the oauth approval URL in the browser. Defaults to true (default true)
-  -v, --version
-        print version and exit
+      --client-id string       The ClientID for the application
+      --client-secret string   The ClientSecret for the application
+  -c, --config string          Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.
+      --file ~/.kube/config    The file to write to. If not specified, ~/.kube/config is used
+  -o, --open                   Open the oauth approval URL in the browser (default true)
+  -v, --version                Print version and exit
+  -w, --write                  Write config to file. Merges in the specified file
 ```
 
 ## Wishlist
 
-- [ ] Add tests/CI
-- [ ] Add docker builds to CI
+- [x] Add tests/CI
+- [x] Add docker builds to CI
 
 ## License
 
