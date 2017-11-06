@@ -1,3 +1,6 @@
+[![Docker Build Status](https://img.shields.io/docker/build/micahhausler/k8s-oidc-helper.svg)](https://hub.docker.com/r/micahhausler/k8s-oidc-helper/)
+[![Build Status](https://travis-ci.org/micahhausler/k8s-oidc-helper.svg?branch=master)](https://travis-ci.org/micahhausler/k8s-oidc-helper)
+
 # k8s-oidc-helper
 
 This is a small helper tool to get a user get authenticated with
