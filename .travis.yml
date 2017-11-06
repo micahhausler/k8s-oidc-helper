@@ -1,0 +1,15 @@
+sudo: false
+language: go
+
+go:
+- 1.9
+- tip
+
+before_install:
+- go get golang.org/x/tools/cmd/cover
+- go get -u github.com/golang/lint/golint
+
+script:
+- go build -i
+- go test ./...
+- go test -race ./...

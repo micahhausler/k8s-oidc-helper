@@ -2,238 +2,138 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/url"
+	"io/ioutil"
 	"os"
-	"os/exec"
-	"runtime"
+	"os/user"
+	"path/filepath"
 	"strings"
 
-	flag "github.com/ogier/pflag"
-	yaml "gopkg.in/yaml.v2"
+	"github.com/ghodss/yaml"
+	"github.com/micahhausler/k8s-oidc-helper/internal/helper"
+	flag "github.com/spf13/pflag"
+	viper "github.com/spf13/viper"
+	k8s_runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 )
 
-const Version = "0.0.1"
-
-var version = flag.BoolP("version", "v", false, "print version and exit")
-
-var openBrowser = flag.BoolP("open", "o", true, "Open the oauth approval URL in the browser")
-
-var clientIDFlag = flag.String("client-id", "", "The ClientID for the application")
-var clientSecretFlag = flag.String("client-secret", "", "The ClientSecret for the application")
-var appFile = flag.StringP("config", "c", "", "Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.")
+const Version = "v0.1.0"
 
 const oauthUrl = "https://accounts.google.com/o/oauth2/auth?redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
 
-type ConfigFile struct {
-	Installed *GoogleConfig `json:"installed"`
-}
-
-type GoogleConfig struct {
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-}
-
-type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	IdToken      string `json:"id_token"`
-}
-
-func readConfig(path string) (*GoogleConfig, error) {
-	f, err := os.Open(path)
-	defer f.Close()
-	if err != nil {
-		return nil, err
-	}
-	cf := &ConfigFile{}
-	err = json.NewDecoder(f).Decode(cf)
-	if err != nil {
-		return nil, err
-	}
-	return cf.Installed, nil
-}
-
-// Get the id_token and refresh_token from google
-func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
-	val := url.Values{}
-	val.Add("grant_type", "authorization_code")
-	val.Add("redirect_uri", "urn:ietf:wg:oauth:2.0:oob")
-	val.Add("client_id", clientID)
-	val.Add("client_secret", clientSecret)
-	val.Add("code", code)
-
-	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v3/token", val)
-	defer resp.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-	tr := &TokenResponse{}
-	err = json.NewDecoder(resp.Body).Decode(tr)
-	if err != nil {
-		return nil, err
-	}
-	return tr, nil
-}
-
-type KubectlUser struct {
-	Name         string        `yaml:"name"`
-	KubeUserInfo *KubeUserInfo `yaml:"user"`
-}
-
-type KubeUserInfo struct {
-	AuthProvider *AuthProvider `yaml:"auth-provider"`
-}
-
-type AuthProvider struct {
-	APConfig *APConfig `yaml:"config"`
-	Name     string    `yaml:"name"`
-}
-
-type APConfig struct {
-	ClientID     string `yaml:"client-id"`
-	ClientSecret string `yaml:"client-secret"`
-	IdToken      string `yaml:"id-token"`
-	IdpIssuerUrl string `yaml:"idp-issuer-url"`
-	RefreshToken string `yaml:"refresh-token"`
-}
-
-type UserInfo struct {
-	Email string `json:"email"`
-}
-
-func getUserEmail(accessToken string) (string, error) {
-	uri, _ := url.Parse("https://www.googleapis.com/oauth2/v1/userinfo")
-	q := uri.Query()
-	q.Set("alt", "json")
-	q.Set("access_token", accessToken)
-	uri.RawQuery = q.Encode()
-	resp, err := http.Get(uri.String())
-	defer resp.Body.Close()
-	if err != nil {
-		return "", err
-	}
-	ui := &UserInfo{}
-	err = json.NewDecoder(resp.Body).Decode(ui)
-	if err != nil {
-		return "", err
-	}
-	return ui.Email, nil
-}
-
-func generateUser(email, clientId, clientSecret, idToken, refreshToken string) *KubectlUser {
-	return &KubectlUser{
-		Name: email,
-		KubeUserInfo: &KubeUserInfo{
-			AuthProvider: &AuthProvider{
-				APConfig: &APConfig{
-					ClientID:     clientId,
-					ClientSecret: clientSecret,
-					IdToken:      idToken,
-					IdpIssuerUrl: "https://accounts.google.com",
-					RefreshToken: refreshToken,
-				},
-				Name: "oidc",
-			},
-		},
-	}
-}
-
-func createOpenCmd(oauthUrl, clientID string) (*exec.Cmd, error) {
-	url := fmt.Sprintf(oauthUrl, clientID)
-
-	switch os := runtime.GOOS; os {
-	case "darwin":
-		return exec.Command("open", url), nil
-	case "linux":
-		return exec.Command("xdg-open", url), nil
-	}
-
-	return nil, fmt.Errorf("Could not detect the open command for OS: %s", runtime.GOOS)
-}
-
-func launchBrowser(openBrowser bool, oauthUrl, clientID string) {
-	openInstructions := fmt.Sprintf("Open this url in your browser: %s\n", fmt.Sprintf(oauthUrl, clientID))
-
-	if !openBrowser {
-		fmt.Print(openInstructions)
-		return
-	}
-
-	cmd, err := createOpenCmd(oauthUrl, clientID)
-	if err != nil {
-		fmt.Print(openInstructions)
-		return
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		fmt.Print(openInstructions)
-	}
-}
-
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n\n", os.Args[0])
-		flag.PrintDefaults()
-	}
+	flag.BoolP("version", "v", false, "Print version and exit")
+	flag.BoolP("open", "o", true, "Open the oauth approval URL in the browser")
+	flag.String("client-id", "", "The ClientID for the application")
+	flag.String("client-secret", "", "The ClientSecret for the application")
+	flag.StringP("config", "c", "", "Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.")
+	flag.BoolP("write", "w", false, "Write config to file. Merges in the specified file")
+	flag.String("file", "", "The file to write to. If not specified, `~/.kube/config` is used")
+
+	viper.BindPFlags(flag.CommandLine)
+	viper.SetEnvPrefix("k8s-oidc-helper")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	flag.Parse()
 
-	if *version {
+	if viper.GetBool("version") {
 		fmt.Printf("k8s-oidc-helper %s\n", Version)
 		os.Exit(0)
 	}
 
-	var gcf *GoogleConfig
+	var gcf *helper.GoogleConfig
 	var err error
-	if len(*appFile) > 0 {
-		gcf, err = readConfig(*appFile)
+	if configFile := viper.GetString("config"); len(viper.GetString("config")) > 0 {
+		gcf, err = helper.ReadConfig(configFile)
 		if err != nil {
-			fmt.Printf("Error reading config file %s: %s\n", *appFile, err)
+			fmt.Printf("Error reading config file %s: %s\n", configFile, err)
 			os.Exit(1)
 		}
 	}
+
 	var clientID string
 	var clientSecret string
 	if gcf != nil {
 		clientID = gcf.ClientID
 		clientSecret = gcf.ClientSecret
 	} else {
-		clientID = *clientIDFlag
-		clientSecret = *clientSecretFlag
+		clientID = viper.GetString("client-id")
+		clientSecret = viper.GetString("client-secret")
 	}
 
-	launchBrowser(*openBrowser, oauthUrl, clientID)
+	helper.LaunchBrowser(viper.GetBool("open"), oauthUrl, clientID)
 
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter the code Google gave you: ")
 	code, _ := reader.ReadString('\n')
 	code = strings.TrimSpace(code)
 
-	tokResponse, err := getTokens(clientID, clientSecret, code)
+	tokResponse, err := helper.GetToken(clientID, clientSecret, code)
 	if err != nil {
 		fmt.Printf("Error getting tokens: %s\n", err)
 		os.Exit(1)
 	}
 
-	email, err := getUserEmail(tokResponse.AccessToken)
+	email, err := helper.GetUserEmail(tokResponse.AccessToken)
 	if err != nil {
 		fmt.Printf("Error getting user email: %s\n", err)
 		os.Exit(1)
 	}
 
-	userConfig := generateUser(email, clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
-	output := map[string][]*KubectlUser{}
-	output["users"] = []*KubectlUser{userConfig}
-	response, err := yaml.Marshal(output)
+	authInfo := helper.GenerateAuthInfo(clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
+	config := &clientcmdapi.Config{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{email: authInfo},
+	}
+
+	if !viper.GetBool("write") {
+		fmt.Println("\n# Add the following to your ~/.kube/config")
+
+		json, err := k8s_runtime.Encode(clientcmdlatest.Codec, config)
+		if err != nil {
+			fmt.Printf("Unexpected error: %v", err)
+			os.Exit(1)
+		}
+		output, err := yaml.JSONToYAML(json)
+		if err != nil {
+			fmt.Printf("Unexpected error: %v", err)
+			os.Exit(1)
+		}
+		fmt.Printf("%v", string(output))
+		return
+	}
+
+	tempKubeConfig, err := ioutil.TempFile("", "")
 	if err != nil {
-		fmt.Printf("Error marshaling yaml: %s\n", err)
+		fmt.Printf("Could not create tempfile: %v", err)
 		os.Exit(1)
 	}
-	fmt.Println("\n# Add the following to your ~/.kube/config")
-	fmt.Println(string(response))
+	defer os.Remove(tempKubeConfig.Name())
+	clientcmd.WriteToFile(*config, tempKubeConfig.Name())
 
+	var kubeConfigPath string
+	if viper.GetString("file") == "" {
+		usr, err := user.Current()
+		if err != nil {
+			fmt.Printf("Could not determine current: %v", err)
+			os.Exit(1)
+		}
+		kubeConfigPath = filepath.Join(usr.HomeDir, ".kube", "config")
+	} else {
+		kubeConfigPath = viper.GetString("file")
+	}
+
+	loadingRules := clientcmd.ClientConfigLoadingRules{
+		Precedence: []string{tempKubeConfig.Name(), kubeConfigPath},
+	}
+	mergedConfig, err := loadingRules.Load()
+	if err != nil {
+		fmt.Printf("Could not merge configuration: %v", err)
+		os.Exit(1)
+	}
+
+	clientcmd.WriteToFile(*mergedConfig, kubeConfigPath)
+	fmt.Printf("Configuration has been written to %s\n", kubeConfigPath)
 }
