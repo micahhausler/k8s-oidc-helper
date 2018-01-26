@@ -29,6 +29,7 @@ func main() {
 	flag.String("client-id", "", "The ClientID for the application")
 	flag.String("client-secret", "", "The ClientSecret for the application")
 	flag.StringP("config", "c", "", "Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.")
+	flag.Bool("no-client-secret", false, "Exclude client-secret from kubeconfig.")
 	flag.BoolP("write", "w", false, "Write config to file. Merges in the specified file")
 	flag.String("file", "", "The file to write to. If not specified, `~/.kube/config` is used")
 
@@ -83,7 +84,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	authInfo := helper.GenerateAuthInfo(clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
+	var authInfo *clientcmdapi.AuthInfo
+	if viper.GetBool("no-client-secret") {
+		authInfo = helper.GenerateAuthInfoWithoutSecret(clientID, tokResponse.IdToken, tokResponse.RefreshToken)
+	} else {
+		authInfo = helper.GenerateAuthInfo(clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
+	}
+
 	config := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{email: authInfo},
 	}

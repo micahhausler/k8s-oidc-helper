@@ -123,6 +123,20 @@ func GenerateAuthInfo(clientId, clientSecret, idToken, refreshToken string) *cli
 	}
 }
 
+func GenerateAuthInfoWithoutSecret(clientId, idToken, refreshToken string) *clientcmdapi.AuthInfo {
+	return &clientcmdapi.AuthInfo{
+		AuthProvider: &clientcmdapi.AuthProviderConfig{
+			Name: "oidc",
+			Config: map[string]string{
+				"client-id":      clientId,
+				"id-token":       idToken,
+				"idp-issuer-url": "https://accounts.google.com",
+				"refresh-token":  refreshToken,
+			},
+		},
+	}
+}
+
 func createOpenCmd(oauthUrl, clientID string) (*exec.Cmd, error) {
 	url := fmt.Sprintf(oauthUrl, clientID)
 
