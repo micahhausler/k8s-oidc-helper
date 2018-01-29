@@ -24,7 +24,7 @@ type GoogleConfig struct {
 type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	IdToken      string `json:"id_token"`
+	IDToken      string `json:"id_token"`
 }
 
 func ReadConfig(path string) (*GoogleConfig, error) {
@@ -81,8 +81,8 @@ type AuthProvider struct {
 type APConfig struct {
 	ClientID     string `yaml:"client-id"`
 	ClientSecret string `yaml:"client-secret"`
-	IdToken      string `yaml:"id-token"`
-	IdpIssuerUrl string `yaml:"idp-issuer-url"`
+	IDToken      string `yaml:"id-token"`
+	IdpIssuerURL string `yaml:"idp-issuer-url"`
 	RefreshToken string `yaml:"refresh-token"`
 }
 
@@ -110,12 +110,12 @@ func GetUserEmail(accessToken string) (string, error) {
 	return ui.Email, nil
 }
 
-func GenerateAuthInfo(clientId, clientSecret, idToken, refreshToken string) *clientcmdapi.AuthInfo {
+func GenerateAuthInfo(clientID, clientSecret, idToken, refreshToken string) *clientcmdapi.AuthInfo {
 	return &clientcmdapi.AuthInfo{
 		AuthProvider: &clientcmdapi.AuthProviderConfig{
 			Name: "oidc",
 			Config: map[string]string{
-				"client-id":      clientId,
+				"client-id":      clientID,
 				"client-secret":  clientSecret,
 				"id-token":       idToken,
 				"idp-issuer-url": "https://accounts.google.com",
@@ -125,8 +125,8 @@ func GenerateAuthInfo(clientId, clientSecret, idToken, refreshToken string) *cli
 	}
 }
 
-func createOpenCmd(oauthUrl, clientID string) (*exec.Cmd, error) {
-	url := fmt.Sprintf(oauthUrl, clientID)
+func createOpenCmd(oauthURL, clientID string) (*exec.Cmd, error) {
+	url := fmt.Sprintf(oauthURL, clientID)
 
 	switch os := runtime.GOOS; os {
 	case "darwin":
@@ -138,15 +138,15 @@ func createOpenCmd(oauthUrl, clientID string) (*exec.Cmd, error) {
 	return nil, fmt.Errorf("Could not detect the open command for OS: %s", runtime.GOOS)
 }
 
-func LaunchBrowser(openBrowser bool, oauthUrl, clientID string) {
-	openInstructions := fmt.Sprintf("Open this url in your browser: %s\n", fmt.Sprintf(oauthUrl, clientID))
+func LaunchBrowser(openBrowser bool, oauthURL, clientID string) {
+	openInstructions := fmt.Sprintf("Open this url in your browser: %s\n", fmt.Sprintf(oauthURL, clientID))
 
 	if !openBrowser {
 		fmt.Print(openInstructions)
 		return
 	}
 
-	cmd, err := createOpenCmd(oauthUrl, clientID)
+	cmd, err := createOpenCmd(oauthURL, clientID)
 	if err != nil {
 		fmt.Print(openInstructions)
 		return

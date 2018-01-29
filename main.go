@@ -21,7 +21,7 @@ import (
 
 const Version = "v0.1.0"
 
-const oauthUrl = "https://accounts.google.com/o/oauth2/auth?redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
+const oauthURL = "https://accounts.google.com/o/oauth2/auth?redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
 
 func main() {
 	flag.BoolP("version", "v", false, "Print version and exit")
@@ -64,7 +64,7 @@ func main() {
 		clientSecret = viper.GetString("client-secret")
 	}
 
-	helper.LaunchBrowser(viper.GetBool("open"), oauthUrl, clientID)
+	helper.LaunchBrowser(viper.GetBool("open"), oauthURL, clientID)
 
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter the code Google gave you: ")
@@ -83,7 +83,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	authInfo := helper.GenerateAuthInfo(clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
+	authInfo := helper.GenerateAuthInfo(clientID, clientSecret, tokResponse.IDToken, tokResponse.RefreshToken)
 	config := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{email: authInfo},
 	}
