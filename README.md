@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/moia-dev//k8s-oidc-helper.svg?branch=master)](https://travis-ci.org/moia-dev//k8s-oidc-helper)
+[![Build Status](https://travis-ci.org/moia-dev/k8s-oidc-helper.svg?branch=master)](https://travis-ci.org/moia-dev/k8s-oidc-helper)
 
 # k8s-oidc-helper
 
