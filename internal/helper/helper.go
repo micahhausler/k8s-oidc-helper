@@ -51,10 +51,11 @@ func GetToken(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val.Add("code", code)
 
 	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v3/token", val)
-	defer resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
+
 	tr := &TokenResponse{}
 	err = json.NewDecoder(resp.Body).Decode(tr)
 	if err != nil {
@@ -96,10 +97,11 @@ func GetUserEmail(accessToken string) (string, error) {
 	q.Set("access_token", accessToken)
 	uri.RawQuery = q.Encode()
 	resp, err := http.Get(uri.String())
-	defer resp.Body.Close()
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
+
 	ui := &UserInfo{}
 	err = json.NewDecoder(resp.Body).Decode(ui)
 	if err != nil {
