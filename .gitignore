@@ -12,6 +12,7 @@ coverage.out
 
 # Build artifacts
 k8s-oidc-helper
+build/
 
 # Architecture specific extensions/prefixes
 *.[568vq]

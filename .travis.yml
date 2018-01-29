@@ -10,6 +10,7 @@ before_install:
 - go get -u github.com/golang/lint/golint
 
 script:
-- go build -i
 - go test ./...
 - go test -race ./...
+- make
+
