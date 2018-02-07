@@ -10,6 +10,8 @@ RUN go install -ldflags '-w'
 
 FROM alpine:latest
 
+RUN apk add -U ca-certificates
+
 COPY --from=builder /go/bin/k8s-oidc-helper /bin/k8s-oidc-helper
 
 ENTRYPOINT ["/bin/k8s-oidc-helper"]
