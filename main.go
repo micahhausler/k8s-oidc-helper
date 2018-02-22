@@ -64,6 +64,16 @@ func main() {
 		clientSecret = viper.GetString("client-secret")
 	}
 
+	if clientID == "" {
+		fmt.Println("No Client ID specified.")
+		os.Exit(1)
+	}
+
+	if clientSecret == "" {
+		fmt.Println("No Client Secret specified.")
+		os.Exit(1)
+	}
+
 	helper.LaunchBrowser(viper.GetBool("open"), oauthUrl, clientID)
 
 	reader := bufio.NewReader(os.Stdin)
