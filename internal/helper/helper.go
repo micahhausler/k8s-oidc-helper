@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -116,10 +115,7 @@ func GetUserClaim(ds DiscoverySpec, accessToken, userClaim string) (string, erro
 	defer resp.Body.Close()
 
 	ui := &UserInfo{}
-	respBytes, _ := ioutil.ReadAll(resp.Body)
-	strResp := string(respBytes)
-	fmt.Printf("Response: %v", strResp)
-	err = json.Unmarshal(respBytes, ui)
+	err = json.NewDecoder(resp.Body).Decode(ui)
 	if err != nil {
 		return "", err
 	}
