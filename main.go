@@ -25,23 +25,18 @@ const userInfoURL = "https://www.googleapis.com/oauth2/v1/userinfo"
 const idpIssuerURL = "https://accounts.google.com"
 const kubectlCMDTemplate = "# Run the following command to configure a kubernetes user for use with `kubectl`\n# ATTENTION iTerm2 users, make sure to run the following in a new terminal/tab\nkubectl config set-credentials %s \\\n--auth-provider=oidc \\\n--auth-provider-arg=client-id=%s \\\n--auth-provider-arg=client-secret=%s \\\n--auth-provider-arg=id-token=%s \\\n--auth-provider-arg=idp-issuer-url=%s \\\n--auth-provider-arg=refresh-token=%s"
 
-type GoogleConfig struct {
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-}
-
-type UserInfo struct {
+type userInfo struct {
 	Email string `json:"email"`
 }
 
-type TokenResponse struct {
+type tokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	IdToken      string `json:"id_token"`
+	IDToken      string `json:"id_token"`
 }
 
 // Get the id_token and refresh_token from google
-func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
+func getTokens(clientID, clientSecret, code string) (*tokenResponse, error) {
 	val := url.Values{}
 	val.Add("grant_type", "authorization_code")
 	val.Add("redirect_uri", callbackURL)
@@ -63,7 +58,7 @@ func getTokens(clientID, clientSecret, code string) (*TokenResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	tr := &TokenResponse{}
+	tr := &tokenResponse{}
 	err = json.NewDecoder(resp.Body).Decode(tr)
 	if err != nil {
 		return nil, err
@@ -91,7 +86,7 @@ func getUserEmail(accessToken string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ui := &UserInfo{}
+	ui := &userInfo{}
 	err = json.NewDecoder(resp.Body).Decode(ui)
 	if err != nil {
 		return "", err
@@ -122,7 +117,7 @@ func googleCallback() http.Handler {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 
-		kubectlCMD := fmt.Sprintf(kubectlCMDTemplate, email, clientID, clientSecret, tokResponse.IdToken, idpIssuerURL, tokResponse.RefreshToken)
+		kubectlCMD := fmt.Sprintf(kubectlCMDTemplate, email, clientID, clientSecret, tokResponse.IDToken, idpIssuerURL, tokResponse.RefreshToken)
 
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write([]byte(kubectlCMD))
