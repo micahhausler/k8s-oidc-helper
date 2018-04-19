@@ -42,7 +42,7 @@ func ReadConfig(path string) (*GoogleConfig, error) {
 }
 
 // Get the id_token and refresh_token from google
-func GetToken(clientID, clientSecret, code string) (*TokenResponse, error) {
+func GetToken(clientID, clientSecret, code, apiVersion string) (*TokenResponse, error) {
 	val := url.Values{}
 	val.Add("grant_type", "authorization_code")
 	val.Add("redirect_uri", "urn:ietf:wg:oauth:2.0:oob")
@@ -50,7 +50,7 @@ func GetToken(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val.Add("client_secret", clientSecret)
 	val.Add("code", code)
 
-	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v3/token", val)
+	resp, err := http.PostForm("https://www.googleapis.com/oauth2/" + apiVersion + "/token", val)
 	if err != nil {
 		return nil, err
 	}

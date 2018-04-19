@@ -31,6 +31,7 @@ func main() {
 	flag.StringP("config", "c", "", "Path to a json file containing your application's ClientID and ClientSecret. Supercedes the --client-id and --client-secret flags.")
 	flag.BoolP("write", "w", false, "Write config to file. Merges in the specified file")
 	flag.String("file", "", "The file to write to. If not specified, `~/.kube/config` is used")
+	flag.String("api-version", "v3", "The Google Oauth2 API version. Use v4 for k8s v1.10 or later")
 
 	viper.BindPFlags(flag.CommandLine)
 	viper.SetEnvPrefix("k8s-oidc-helper")
@@ -71,7 +72,7 @@ func main() {
 	code, _ := reader.ReadString('\n')
 	code = strings.TrimSpace(code)
 
-	tokResponse, err := helper.GetToken(clientID, clientSecret, code)
+	tokResponse, err := helper.GetToken(clientID, clientSecret, code, viper.GetString("api-version"))
 	if err != nil {
 		fmt.Printf("Error getting tokens: %s\n", err)
 		os.Exit(1)
