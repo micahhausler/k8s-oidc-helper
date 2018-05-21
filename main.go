@@ -2,12 +2,15 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/ghodss/yaml"
 	"github.com/micahhausler/k8s-oidc-helper/internal/helper"
@@ -19,9 +22,17 @@ import (
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 )
 
-const Version = "v0.1.0"
+const Version = "v0.1.1-alpha.1"
 
-const oauthUrl = "https://accounts.google.com/o/oauth2/auth?redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
+// urlTemplate is the template URL for the OIDC IDP request.
+var urlTemplate = template.Must(template.New("url").Parse("{{.URLPath}}?redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&client_id={{.ClientID}}&scope={{.Scope}}&approval_prompt=force&access_type=offline"))
+
+// UrlValues contains all values that will be substituted into the URL template.
+type UrlValues struct {
+	URLPath  string
+	Scope    string
+	ClientID string
+}
 
 func main() {
 	flag.BoolP("version", "v", false, "Print version and exit")
@@ -32,12 +43,18 @@ func main() {
 	flag.BoolP("write", "w", false, "Write config to file. Merges in the specified file")
 	flag.String("file", "", "The file to write to. If not specified, `~/.kube/config` is used")
 
+	var urlTpl UrlValues
+	flag.StringVar(&urlTpl.URLPath, "oauth-url", "https://accounts.google.com/o/oauth2/auth", "The identity provider URL")
+	flag.StringVar(&urlTpl.Scope, "scope", "openid+email+profile", "The scope to request from the identity provider")
+
 	viper.BindPFlags(flag.CommandLine)
 	viper.SetEnvPrefix("k8s-oidc-helper")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	flag.Parse()
+
+	urlTpl.Scope = url.PathEscape(urlTpl.Scope)
 
 	if viper.GetBool("version") {
 		fmt.Printf("k8s-oidc-helper %s\n", Version)
@@ -54,24 +71,29 @@ func main() {
 		}
 	}
 
-	var clientID string
 	var clientSecret string
 	if gcf != nil {
-		clientID = gcf.ClientID
+		urlTpl.ClientID = gcf.ClientID
 		clientSecret = gcf.ClientSecret
 	} else {
-		clientID = viper.GetString("client-id")
+		urlTpl.ClientID = viper.GetString("client-id")
 		clientSecret = viper.GetString("client-secret")
 	}
 
-	helper.LaunchBrowser(viper.GetBool("open"), oauthUrl, clientID)
+	url := bytes.NewBuffer(nil)
+	if err := urlTemplate.Execute(url, urlTpl); err != nil {
+		fmt.Printf("Error building request URL: %s\n", err)
+		os.Exit(2)
+	}
+
+	helper.LaunchBrowser(viper.GetBool("open"), url.String())
 
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter the code Google gave you: ")
 	code, _ := reader.ReadString('\n')
 	code = strings.TrimSpace(code)
 
-	tokResponse, err := helper.GetToken(clientID, clientSecret, code)
+	tokResponse, err := helper.GetToken(urlTpl.ClientID, clientSecret, code)
 	if err != nil {
 		fmt.Printf("Error getting tokens: %s\n", err)
 		os.Exit(1)
@@ -83,7 +105,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	authInfo := helper.GenerateAuthInfo(clientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
+	authInfo := helper.GenerateAuthInfo(urlTpl.ClientID, clientSecret, tokResponse.IdToken, tokResponse.RefreshToken)
 	config := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{email: authInfo},
 	}
