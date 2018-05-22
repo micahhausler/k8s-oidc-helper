@@ -47,6 +47,10 @@ func main() {
 	flag.StringVar(&urlTpl.URLPath, "oauth-url", "https://accounts.google.com/o/oauth2/auth", "The identity provider URL")
 	flag.StringVar(&urlTpl.Scope, "scope", "openid+email+profile", "The scope to request from the identity provider")
 
+	var endpoints helper.Endpoints
+	flag.StringVar(&endpoints.TokenEndpoint, "oauth-token-endpoint", "https://www.googleapis.com/oauth2/v3/token", "The endpoint to use to obtain the oauth token")
+	flag.StringVar(&endpoints.UserInfoEndpoint, "oauth-userinfo-endpoint", "https://www.googleapis.com/oauth2/v1/userinfo", "The endpoint to use to obtain the userinfo")
+
 	viper.BindPFlags(flag.CommandLine)
 	viper.SetEnvPrefix("k8s-oidc-helper")
 	viper.AutomaticEnv()
@@ -93,13 +97,13 @@ func main() {
 	code, _ := reader.ReadString('\n')
 	code = strings.TrimSpace(code)
 
-	tokResponse, err := helper.GetToken(urlTpl.ClientID, clientSecret, code)
+	tokResponse, err := endpoints.GetToken(urlTpl.ClientID, clientSecret, code)
 	if err != nil {
 		fmt.Printf("Error getting tokens: %s\n", err)
 		os.Exit(1)
 	}
 
-	email, err := helper.GetUserEmail(tokResponse.AccessToken)
+	email, err := endpoints.GetUserEmail(tokResponse.AccessToken)
 	if err != nil {
 		fmt.Printf("Error getting user email: %s\n", err)
 		os.Exit(1)

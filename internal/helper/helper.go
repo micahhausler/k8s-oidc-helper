@@ -27,6 +27,12 @@ type TokenResponse struct {
 	IdToken      string `json:"id_token"`
 }
 
+// Endpoints contains the endpoints to be used to retrieve the token data.
+type Endpoints struct {
+	TokenEndpoint    string
+	UserInfoEndpoint string
+}
+
 func ReadConfig(path string) (*GoogleConfig, error) {
 	f, err := os.Open(path)
 	defer f.Close()
@@ -42,7 +48,7 @@ func ReadConfig(path string) (*GoogleConfig, error) {
 }
 
 // Get the id_token and refresh_token from google
-func GetToken(clientID, clientSecret, code string) (*TokenResponse, error) {
+func (e Endpoints) GetToken(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val := url.Values{}
 	val.Add("grant_type", "authorization_code")
 	val.Add("redirect_uri", "urn:ietf:wg:oauth:2.0:oob")
@@ -50,7 +56,7 @@ func GetToken(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val.Add("client_secret", clientSecret)
 	val.Add("code", code)
 
-	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v3/token", val)
+	resp, err := http.PostForm(e.TokenEndpoint, val)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +96,8 @@ type UserInfo struct {
 	Email string `json:"email"`
 }
 
-func GetUserEmail(accessToken string) (string, error) {
-	uri, _ := url.Parse("https://www.googleapis.com/oauth2/v1/userinfo")
+func (e Endpoints) GetUserEmail(accessToken string) (string, error) {
+	uri, _ := url.Parse(e.UserInfoEndpoint)
 	q := uri.Query()
 	q.Set("alt", "json")
 	q.Set("access_token", accessToken)
