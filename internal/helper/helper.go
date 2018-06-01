@@ -38,6 +38,12 @@ func ReadConfig(path string) (*GoogleConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	if cf.Installed == nil {
+		return nil, fmt.Errorf("config file has no 'installed' section; wrong client type?")
+	}
+	if cf.Installed.ClientID == "" {
+		return nil, fmt.Errorf("config file had no client_id defined; wrong client type?")
+	}
 	return cf.Installed, nil
 }
 
