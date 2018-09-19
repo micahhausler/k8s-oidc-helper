@@ -1,14 +1,11 @@
-FROM alpine
-
-ENV GOPATH=/go
-
+FROM golang:alpine AS build
 WORKDIR /go/src/app
-ADD . /go/src/app/
+COPY . /go/src/app/
+RUN apk --no-cache add git &&\
+ go get ./... &&\
+ CGO_ENABLED=0 go build -o /kubernetes-auth-conf .
 
-RUN apk --no-cache add ca-certificates git go musl-dev \
-  && go get ./... \
-  && CGO_ENABLED=0 go build -ldflags '-s -extldflags "-static"' -o /kubernetes-auth-conf . \
-  && apk del go git musl-dev \
-  && rm -rf $GOPATH
-
+FROM alpine:3.8
+RUN apk add --no-cache ca-certificates
+COPY --from=build /kubernetes-auth-conf /kubernetes-auth-conf
 CMD [ "/kubernetes-auth-conf" ]
