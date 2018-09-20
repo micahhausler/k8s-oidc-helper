@@ -11,17 +11,20 @@ import (
 	"os"
 )
 
+// ref: https://accounts.google.com/.well-known/openid-configuration
+const (
+	oauthURL           = "https://accounts.google.com/o/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
+	tokenURL           = "https://oauth2.googleapis.com/token"
+	userInfoURL        = "https://www.googleapis.com/oauth2/v3/userinfo"
+	idpIssuerURL       = "https://accounts.google.com"
+	kubectlCMDTemplate = "# Run the following command to configure a kubernetes user for use with `kubectl`\n# ATTENTION iTerm2 users, make sure to run the following in a new terminal/tab\nkubectl config set-credentials %s \\\n--auth-provider=oidc \\\n--auth-provider-arg=client-id=%s \\\n--auth-provider-arg=client-secret=%s \\\n--auth-provider-arg=id-token=%s \\\n--auth-provider-arg=idp-issuer-url=%s \\\n--auth-provider-arg=refresh-token=%s"
+)
+
 var (
 	clientID     = os.Getenv("CLIENT_ID")
 	clientSecret = os.Getenv("CLIENT_SECRET")
 	callbackURL  = os.Getenv("CALLBACK_URL")
 )
-
-const oauthURL = "https://accounts.google.com/o/oauth2/auth?redirect_uri=%s&response_type=code&client_id=%s&scope=openid+email+profile&approval_prompt=force&access_type=offline"
-const tokenURL = "https://www.googleapis.com/oauth2/v3/token"
-const userInfoURL = "https://www.googleapis.com/oauth2/v1/userinfo"
-const idpIssuerURL = "https://accounts.google.com"
-const kubectlCMDTemplate = "# Run the following command to configure a kubernetes user for use with `kubectl`\n# ATTENTION iTerm2 users, make sure to run the following in a new terminal/tab\nkubectl config set-credentials %s \\\n--auth-provider=oidc \\\n--auth-provider-arg=client-id=%s \\\n--auth-provider-arg=client-secret=%s \\\n--auth-provider-arg=id-token=%s \\\n--auth-provider-arg=idp-issuer-url=%s \\\n--auth-provider-arg=refresh-token=%s"
 
 type userInfo struct {
 	Email string `json:"email"`
