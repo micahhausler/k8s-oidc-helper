@@ -50,7 +50,7 @@ func GetToken(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val.Add("client_secret", clientSecret)
 	val.Add("code", code)
 
-	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v3/token", val)
+	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v4/token", val)
 	if err != nil {
 		return nil, err
 	}
