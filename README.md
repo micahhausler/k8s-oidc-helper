@@ -1,5 +1,5 @@
-[![Docker Build Status](https://img.shields.io/docker/build/micahhausler/k8s-oidc-helper.svg)](https://hub.docker.com/r/micahhausler/k8s-oidc-helper/)
-[![Build Status](https://travis-ci.org/micahhausler/k8s-oidc-helper.svg?branch=master)](https://travis-ci.org/micahhausler/k8s-oidc-helper)
+[![Docker Build Status](https://img.shields.io/docker/build/smooch/k8s-oidc-helper.svg)](https://hub.docker.com/r/smooch/k8s-oidc-helper/)
+[![Build Status](https://travis-ci.org/smooch/k8s-oidc-helper.svg?branch=master)](https://travis-ci.org/smooch/k8s-oidc-helper)
 
 # k8s-oidc-helper
 
@@ -92,7 +92,7 @@ roleRef:
 ## Installation
 
 ```
-go get github.com/micahhausler/k8s-oidc-helper
+go get github.com/smooch/k8s-oidc-helper
 ```
 
 ## Usage
