@@ -50,7 +50,7 @@ func GetToken(clientID, clientSecret, code string) (*TokenResponse, error) {
 	val.Add("client_secret", clientSecret)
 	val.Add("code", code)
 
-	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v3/token", val)
+	resp, err := http.PostForm("https://www.googleapis.com/oauth2/v4/token", val)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ type UserInfo struct {
 }
 
 func GetUserEmail(accessToken string) (string, error) {
-	uri, _ := url.Parse("https://www.googleapis.com/oauth2/v1/userinfo")
+	uri, _ := url.Parse("https://www.googleapis.com/oauth2/v3/userinfo")
 	q := uri.Query()
 	q.Set("alt", "json")
 	q.Set("access_token", accessToken)
